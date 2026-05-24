@@ -1,62 +1,35 @@
 package com.ferdausfs.erudadevtools
 
-import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.webkit.ConsoleMessage
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.webkit.*
 import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.preference.PreferenceManager
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var urlBar: EditText
-    private lateinit var backBtn: ImageButton
-    private lateinit var forwardBtn: ImageButton
-    private lateinit var refreshBtn: ImageButton
-    private lateinit var statusBar: TextView
     private lateinit var progressBar: ProgressBar
+    private lateinit var statusText: TextView
 
-    private val prefsName = "eruda_prefs"
-    private val keyAutoInject = "auto_inject_eruda"
-    private val keyDarkMode = "dark_mode_webview"
-    private val keyHomepage = "homepage_url"
-    private val defaultHomepage = "https://example.com"
+    private var erudaJs: String = ""
 
-    private val erudaInjectionScript = """
-        (function() {
-          if (window.__erudaInjected) return;
-          window.__erudaInjected = true;
-          var s = document.createElement('script');
-          s.src = 'file:///android_asset/eruda.js';
-          document.head.appendChild(s);
-          s.onload = function() { eruda.init(); };
-        })();
-    """.trimIndent()
-
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -67,197 +40,157 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
         urlBar = findViewById(R.id.urlBar)
-        backBtn = findViewById(R.id.backBtn)
-        forwardBtn = findViewById(R.id.forwardBtn)
-        refreshBtn = findViewById(R.id.refreshBtn)
-        statusBar = findViewById(R.id.statusBar)
         progressBar = findViewById(R.id.progressBar)
+        statusText = findViewById(R.id.statusText)
 
-        configureWebView()
-        setupListeners()
-        applyDarkModeIfEnabled()
-
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState)
-        } else {
-            val home = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-                .getString(keyHomepage, defaultHomepage) ?: defaultHomepage
-            loadUrl(home)
+        // Load eruda.js from assets
+        try {
+            erudaJs = assets.open("eruda.js").bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
+
+        setupWebView()
+        setupUrlBar()
+        setupNavButtons()
+
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val homepage = prefs.getString("homepage", "https://example.com") ?: "https://example.com"
+        loadUrl(homepage)
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun configureWebView() {
-        val settings: WebSettings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.allowFileAccess = true
-        settings.allowContentAccess = true
-        settings.databaseEnabled = true
-        settings.loadWithOverviewMode = true
-        settings.useWideViewPort = true
-        settings.builtInZoomControls = true
-        settings.displayZoomControls = false
-        settings.setSupportZoom(true)
-        settings.javaScriptCanOpenWindowsAutomatically = true
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        // Keep default Android UA — do not override
+    private fun setupWebView() {
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = true
+            allowContentAccess = true
+            @Suppress("DEPRECATION")
+            allowUniversalAccessFromFileURLs = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            setSupportZoom(true)
+            builtInZoomControls = true
+            displayZoomControls = false
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            databaseEnabled = true
+            cacheMode = WebSettings.LOAD_DEFAULT
+        }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView?,
-                request: WebResourceRequest?
-            ): Boolean {
-                val url = request?.url?.toString() ?: return false
-                view?.loadUrl(url)
-                return true
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val url = request.url.toString()
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    view.loadUrl(url)
+                    return true
+                }
+                return false
             }
 
-            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                super.onPageStarted(view, url, favicon)
+            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                 progressBar.visibility = View.VISIBLE
-                statusBar.text = getString(R.string.status_loading, url ?: "")
-                urlBar.setText(url ?: "")
+                urlBar.setText(url)
+                statusText.text = getString(R.string.loading)
             }
 
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
+            override fun onPageFinished(view: WebView, url: String) {
                 progressBar.visibility = View.GONE
-                statusBar.text = getString(R.string.status_loaded, url ?: "")
-                urlBar.setText(url ?: "")
-                updateNavButtons()
-                injectErudaIfEnabled()
+                urlBar.setText(url)
+                statusText.text = url
+                injectEruda(view)
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame) {
+                    statusText.text = getString(R.string.error_loading)
+                }
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
-            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                consoleMessage?.let {
-                    Log.d(
-                        "ErudaWebViewConsole",
-                        "[${it.messageLevel()}] ${it.message()} -- ${it.sourceId()}:${it.lineNumber()}"
-                    )
-                }
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                progressBar.progress = newProgress
+            }
+
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                android.util.Log.d("ErudaConsole",
+                    "[${consoleMessage.messageLevel()}] ${consoleMessage.message()} " +
+                    "(${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})")
                 return true
             }
 
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
-                progressBar.progress = newProgress
-                if (newProgress < 100) {
-                    progressBar.visibility = View.VISIBLE
-                } else {
-                    progressBar.visibility = View.GONE
-                }
-            }
-
-            override fun onJsAlert(
-                view: WebView?,
-                url: String?,
-                message: String?,
-                result: android.webkit.JsResult?
-            ): Boolean {
-                Log.d("ErudaWebViewJSAlert", "JS Alert: $message")
-                Toast.makeText(this@MainActivity, message ?: "", Toast.LENGTH_SHORT).show()
-                result?.confirm()
+            override fun onJsAlert(view: WebView, url: String, message: String,
+                                   result: JsResult): Boolean {
+                androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                    .setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result.confirm() }
+                    .setCancelable(false)
+                    .show()
                 return true
             }
         }
     }
 
-    private fun setupListeners() {
+    private fun injectEruda(view: WebView) {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val autoInject = prefs.getBoolean("auto_inject_eruda", true)
+        if (!autoInject || erudaJs.isEmpty()) return
+
+        val script = """
+            (function() {
+                if (window.__erudaInjected) return;
+                window.__erudaInjected = true;
+                try {
+                    $erudaJs
+                    eruda.init();
+                } catch(e) {
+                    console.error('Eruda injection failed: ' + e.message);
+                }
+            })();
+        """.trimIndent()
+
+        view.evaluateJavascript(script, null)
+    }
+
+    private fun setupUrlBar() {
         urlBar.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO ||
-                actionId == EditorInfo.IME_ACTION_DONE ||
-                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
-            ) {
-                loadUrl(urlBar.text.toString())
+                (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
+                val input = urlBar.text.toString().trim()
+                loadUrl(input)
                 hideKeyboard()
                 true
-            } else {
-                false
-            }
+            } else false
         }
+    }
 
-        backBtn.setOnClickListener {
+    private fun setupNavButtons() {
+        findViewById<View>(R.id.btnBack).setOnClickListener {
             if (webView.canGoBack()) webView.goBack()
         }
-        forwardBtn.setOnClickListener {
+        findViewById<View>(R.id.btnForward).setOnClickListener {
             if (webView.canGoForward()) webView.goForward()
         }
-        refreshBtn.setOnClickListener {
+        findViewById<View>(R.id.btnRefresh).setOnClickListener {
             webView.reload()
         }
     }
 
-    private fun updateNavButtons() {
-        backBtn.isEnabled = webView.canGoBack()
-        backBtn.alpha = if (webView.canGoBack()) 1f else 0.4f
-        forwardBtn.isEnabled = webView.canGoForward()
-        forwardBtn.alpha = if (webView.canGoForward()) 1f else 0.4f
-    }
-
-    private fun loadUrl(raw: String) {
-        var url = raw.trim()
-        if (url.isEmpty()) return
-        if (!url.startsWith("http://", ignoreCase = true) &&
-            !url.startsWith("https://", ignoreCase = true) &&
-            !url.startsWith("file://", ignoreCase = true) &&
-            !url.startsWith("about:", ignoreCase = true)
-        ) {
-            // Smart bar: if contains dot and no spaces, treat as URL; else search Google
-            url = if (url.contains(".") && !url.contains(" ")) {
-                "https://$url"
-            } else {
-                "https://www.google.com/search?q=" + Uri.encode(url)
-            }
+    private fun loadUrl(input: String) {
+        val url = when {
+            input.startsWith("http://") || input.startsWith("https://") -> input
+            input.contains(".") && !input.contains(" ") -> "https://$input"
+            else -> "https://www.google.com/search?q=${Uri.encode(input)}"
         }
         webView.loadUrl(url)
-    }
-
-    private fun injectErudaIfEnabled() {
-        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        val autoInject = prefs.getBoolean(keyAutoInject, true)
-        if (!autoInject) return
-
-        webView.evaluateJavascript(erudaInjectionScript, null)
-        // Fallback: also try loadUrl javascript: scheme
-        webView.post {
-            try {
-                webView.loadUrl("javascript:$erudaInjectionScript")
-            } catch (e: Exception) {
-                Log.w("ErudaInject", "Fallback injection failed: ${e.message}")
-            }
-        }
-    }
-
-    private fun applyDarkModeIfEnabled() {
-        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        val dark = prefs.getBoolean(keyDarkMode, false)
-        if (dark) {
-            webView.setBackgroundColor(Color.parseColor("#121212"))
-        } else {
-            webView.setBackgroundColor(Color.WHITE)
-        }
     }
 
     private fun hideKeyboard() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(urlBar.windowToken, 0)
-        urlBar.clearFocus()
     }
 
-    override fun onResume() {
-        super.onResume()
-        applyDarkModeIfEnabled()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        webView.saveState(outState)
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
         return true
     }
@@ -270,7 +203,8 @@ class MainActivity : AppCompatActivity() {
             }
             R.id.action_clear_cache -> {
                 webView.clearCache(true)
-                Toast.makeText(this, R.string.toast_cache_cleared, Toast.LENGTH_SHORT).show()
+                webView.clearHistory()
+                Toast.makeText(this, R.string.cache_cleared, Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.action_reload -> {
@@ -278,26 +212,20 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             R.id.action_copy_url -> {
-                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("url", webView.url ?: ""))
-                Toast.makeText(this, R.string.toast_url_copied, Toast.LENGTH_SHORT).show()
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("URL", webView.url))
+                Toast.makeText(this, R.string.url_copied, Toast.LENGTH_SHORT).show()
                 true
             }
-            R.id.action_open_in_browser -> {
-                val current = webView.url
-                if (!current.isNullOrEmpty()) {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(current))
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        Toast.makeText(this, R.string.toast_no_browser, Toast.LENGTH_SHORT).show()
-                    }
+            R.id.action_open_browser -> {
+                webView.url?.let {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it)))
                 }
                 true
             }
             R.id.action_inject_eruda -> {
-                webView.evaluateJavascript(erudaInjectionScript, null)
-                Toast.makeText(this, R.string.toast_eruda_injected, Toast.LENGTH_SHORT).show()
+                injectEruda(webView)
+                Toast.makeText(this, R.string.eruda_injected, Toast.LENGTH_SHORT).show()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -305,10 +233,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
-        }
+        if (webView.canGoBack()) webView.goBack()
+        else super.onBackPressed()
     }
 }

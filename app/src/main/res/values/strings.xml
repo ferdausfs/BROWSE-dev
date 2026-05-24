@@ -1,40 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Eruda DevTools</string>
+    <string name="settings">Settings</string>
+    <string name="reload">Reload</string>
+    <string name="copy_url">Copy URL</string>
+    <string name="clear_cache">Clear Cache</string>
+    <string name="open_in_browser">Open in Browser</string>
+    <string name="inject_eruda">Inject Eruda</string>
+    <string name="loading">Loading…</string>
+    <string name="error_loading">Failed to load page</string>
+    <string name="cache_cleared">Cache cleared</string>
+    <string name="url_copied">URL copied to clipboard</string>
+    <string name="eruda_injected">Eruda injected!</string>
 
-    <string name="hint_url">Enter URL or search</string>
-    <string name="hint_homepage">https://example.com</string>
-
-    <string name="status_ready">Ready</string>
-    <string name="status_loading">Loading: %1$s</string>
-    <string name="status_loaded">Loaded: %1$s</string>
-
-    <string name="cd_back">Back</string>
-    <string name="cd_forward">Forward</string>
-    <string name="cd_refresh">Refresh</string>
-
-    <string name="menu_settings">Settings</string>
-    <string name="menu_clear_cache">Clear Cache</string>
-    <string name="menu_reload">Reload</string>
-    <string name="menu_copy_url">Copy URL</string>
-    <string name="menu_open_in_browser">Open in Browser</string>
-    <string name="menu_inject_eruda">Inject Eruda Now</string>
-
-    <string name="settings_title">Settings</string>
-    <string name="settings_header">Eruda DevTools Settings</string>
-    <string name="setting_auto_inject">Auto-inject Eruda</string>
-    <string name="setting_auto_inject_desc">Automatically inject Eruda DevTools after every page load.</string>
-    <string name="setting_dark_mode">Dark WebView background</string>
-    <string name="setting_dark_mode_desc">Use a dark background color for the WebView container.</string>
-    <string name="setting_homepage">Default homepage URL</string>
-
-    <string name="btn_save">Save</string>
-    <string name="btn_reset">Reset</string>
-
-    <string name="toast_cache_cleared">Cache cleared</string>
-    <string name="toast_url_copied">URL copied</string>
-    <string name="toast_no_browser">No browser available</string>
-    <string name="toast_eruda_injected">Eruda injected</string>
-    <string name="toast_settings_saved">Settings saved</string>
-    <string name="toast_settings_reset">Settings reset to defaults</string>
+    <!-- Settings -->
+    <string name="pref_auto_inject_title">Auto-inject Eruda</string>
+    <string name="pref_auto_inject_summary">Automatically inject Eruda on every page load</string>
+    <string name="pref_homepage_title">Homepage</string>
+    <string name="pref_homepage_summary">Default URL when app opens</string>
+    <string name="pref_dark_bg_title">Dark WebView Background</string>
+    <string name="pref_dark_bg_summary">Set dark background before page loads</string>
 </resources>

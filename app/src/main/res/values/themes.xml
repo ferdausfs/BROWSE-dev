@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ErudaDevTools" parent="Theme.MaterialComponents.Light.DarkActionBar">
-        <item name="colorPrimary">#1976D2</item>
-        <item name="colorPrimaryDark">#0D47A1</item>
-        <item name="colorAccent">#FF4081</item>
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
-        <item name="android:statusBarColor">#0D47A1</item>
+    <style name="Theme.ErudaDevTools" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#58A6FF</item>
+        <item name="colorPrimaryVariant">#1F6FEB</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#3FB950</item>
+        <item name="colorSurface">#161B22</item>
+        <item name="android:colorBackground">#0D1117</item>
+        <item name="android:windowBackground">#0D1117</item>
+        <item name="android:statusBarColor">#161B22</item>
+        <item name="android:navigationBarColor">#161B22</item>
     </style>
 </resources>
