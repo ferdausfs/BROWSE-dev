@@ -1,29 +1,40 @@
 # Eruda DevTools
 
-Android browser app with built-in [Eruda](https://github.com/liriliri/eruda) mobile DevTools.
+A mobile browser / debugger Android app written in Kotlin. Loads any URL in a WebView and automatically injects [Eruda](https://github.com/liriliri/eruda) — a full-featured mobile browser DevTools (console, network, elements, sources, resources, snippets, info panels).
 
 ## Features
-- Full WebView browser with URL bar, back/forward/refresh
-- Auto-injects Eruda on every page load
-- Console, Network, Elements, Sources, Resources, Snippets, Info panels
-- Settings: toggle auto-inject, set homepage
-- Manual "Inject Eruda" menu option
 
-## Setup
+- URL bar with Back / Forward / Refresh
+- Full-screen WebView with JavaScript, DOM storage, mixed-content support
+- Auto-injects Eruda after every page load
+- Settings: toggle auto-inject, dark WebView background, default homepage
+- Overflow menu: Inject Eruda Now, Reload, Copy URL, Open in Browser, Clear Cache, Settings
+- Bottom status bar with current URL / loading state
 
-### 1. Add eruda.js
-Copy the built `eruda.js` into `app/src/main/assets/eruda.js`.
+## Build
 
-Get it from the [eruda releases](https://github.com/liriliri/eruda/releases) or use the CDN version:
-```
-https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.min.js
-```
-
-### 2. Build
 ```bash
+chmod +x ./gradlew
 ./gradlew assembleDebug
 ```
-APK will be at `app/build/outputs/apk/debug/`.
+
+APK output: `app/build/outputs/apk/debug/app-debug.apk`
+
+## Adding the real Eruda
+
+Replace `app/src/main/assets/eruda.js` with the actual eruda v3.4.3 file:
+
+```bash
+curl -L https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.js -o app/src/main/assets/eruda.js
+```
 
 ## CI
-GitHub Actions auto-builds on every push to `main`. Download APK from the Actions artifacts tab.
+
+GitHub Actions builds a debug APK on every push to `main` and on pull requests, and uploads it as a build artifact (`eruda-devtools-debug-apk`).
+
+## Tech
+
+- Kotlin 1.9.23, AGP 8.3.2, Gradle 8.6
+- minSdk 21, targetSdk 34, compileSdk 34
+- XML layouts (no Jetpack Compose)
+- Package: `com.ferdausfs.erudadevtools`
